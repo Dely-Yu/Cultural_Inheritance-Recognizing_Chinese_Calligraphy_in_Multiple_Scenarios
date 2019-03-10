@@ -4,8 +4,8 @@ import os
 import random
 from tqdm import tqdm
 
-import EAST.cfg as cfg
-from EAST.label import shrink
+import cfg
+from label import shrink
 import pandas as pd
 
 
@@ -105,14 +105,19 @@ def preprocess():
     val_label_dir = os.path.join(data_dir, cfg.val_label_dir_name)
 
     test_image_dir = os.path.join(data_dir, cfg.test_image_dir_name)
-    test_label_dir = os.path.join(data_dir, cfg.test_label_dir_name)
+    # test_label_dir = os.path.join(data_dir, cfg.test_label_dir_name)
 
 
     if not os.path.exists(train_image_dir):
         os.mkdir(train_image_dir)
     if not os.path.exists(train_label_dir):
         os.mkdir(train_label_dir)
-
+    if not os.path.exists(val_image_dir):
+        os.mkdir(val_image_dir)
+    if not os.path.exists(val_label_dir):
+        os.mkdir(val_label_dir)
+    if not os.path.exists(test_image_dir):
+        os.mkdir(test_image_dir)
     draw_gt_quad = cfg.draw_gt_quad
 
     if draw_gt_quad:
@@ -122,7 +127,17 @@ def preprocess():
         show_act_image_dir = os.path.join(cfg.data_dir, cfg.show_act_image_dir_name)
         if not os.path.exists(show_act_image_dir):
             os.mkdir(show_act_image_dir)
-
+    else:
+        show_gt_image_dir=''
+        show_act_image_dir=''
+    f(origin_image_dir, origin_txt_dir,
+          cfg.gen_origin_img, train_image_dir, train_label_dir,
+          draw_gt_quad, show_gt_image_dir
+          , cfg.train_fname)
+    f(origin_val_image_dir,origin_val_txt_dir,
+        cfg.gen_origin_img, val_image_dir, val_label_dir,
+        draw_gt_quad, show_act_image_dir
+        , cfg.val_fname)
     #==================================Train===============================================#
     #
     # label = pd.read_csv(origin_txt_dir)
@@ -191,6 +206,7 @@ def preprocess():
     #                                                  d_wight,
     #                                                  d_height))
     #
+
     # #==================================Val================================================#
     #
     # label = pd.read_csv(origin_val_txt_dir)
@@ -260,14 +276,41 @@ def preprocess():
     #
 
     #================================Test===================================================#
-
-    label = pd.read_csv(origin_test_txt_dir)
-
     o_test_img_list = os.listdir(origin_test_image_dir)
     print('found %d origin images.' % len(o_test_img_list))
     test_set = []
     for o_img_fname in tqdm(o_test_img_list):
         with Image.open(os.path.join(origin_test_image_dir, o_img_fname)) as im:
+            d_wight, d_height = cfg.max_train_img_size, cfg.max_train_img_size
+            im = im.resize((d_wight, d_height), Image.NEAREST).convert('RGB')
+            if cfg.gen_origin_img:
+                im.save(os.path.join(test_image_dir, 'test_'+o_img_fname))
+            test_set.append('{},{},{}\n'.format('test_'+o_img_fname,
+                                                     d_wight,
+                                                     d_height))
+    with open(os.path.join(data_dir, cfg.test_fname), 'w') as f_val:
+        f_val.writelines(test_set)
+    #
+
+def f(origin_image_dir,origin_txt_dir,
+    gen_origin_img,train_image_dir,train_label_dir,
+    draw_gt_quad,show_gt_image_dir
+    ,train_fname):
+#origin_image_dir 存放训练集图像的文件夹
+#origin_txt_dir 训练集的标签文件
+#gen_origin_img 是否生成预处理后的图像
+#train_image_dir 预处理后的图像所在文件夹
+#train_label_dir 预处理后的标签所在文件夹
+#draw_gt_quad 是否生成带bounding——box的图像
+#show_gt_image_dir 预处理后的带bounding-box图像所在文件夹
+#train_fname 提取出训练集图像高度和宽度后生成此txt文件, 文件内容及格式： 文件名 高度 宽度
+    label = pd.read_csv(origin_txt_dir)
+
+    o_img_list = os.listdir(origin_image_dir)
+    print('found %d origin images.' % len(o_img_list))
+    train_val_set = []
+    for o_img_fname in tqdm(o_img_list):
+        with Image.open(os.path.join(origin_image_dir, o_img_fname)) as im:
             # d_wight, d_height = resize_image(im)
             d_wight, d_height = cfg.max_train_img_size, cfg.max_train_img_size
             scale_ratio_w = d_wight / im.width
@@ -276,19 +319,15 @@ def preprocess():
             show_gt_im = im.copy()
             # draw on the img
             draw = ImageDraw.Draw(show_gt_im)
-            # with open(os.path.join(origin_test_txt_dir,'gt_'+o_img_fname[:-4] + '.txt'), 'r',encoding='utf-8-sig') as f:
+            # with open(os.path.join(origin_txt_dir,'gt_'+o_img_fname[:-4] + '.txt'), 'r',encoding='utf-8-sig') as f:
             #     anno_list = f.readlines()
 
             txt = label[label['FileName'] == o_img_fname]
-            anno_list = txt.get_values()
 
+            anno_list = txt.get_values()
             xy_list_array = np.zeros((len(anno_list), 4, 2))
             for anno, i in zip(anno_list, range(len(anno_list))):
-
-                # anno_colums = anno.strip().split(',')
-
                 anno_colums = anno[1:9]
-
                 anno_array = np.array(anno_colums)
                 xy_list = np.reshape(anno_array[:8].astype(float), (4, 2))
                 xy_list[:, 0] = xy_list[:, 0] * scale_ratio_w
@@ -319,31 +358,24 @@ def preprocess():
                                    tuple(xy_list[vs[long_edge][q_th][3]]),
                                    tuple(xy_list[vs[long_edge][q_th][4]])],
                                   width=3, fill='yellow')
-            if cfg.gen_origin_img:
-                im.save(os.path.join(test_image_dir, 'test_'+o_img_fname))
+            if gen_origin_img:
+                im.save(os.path.join(train_image_dir, 'train_' + o_img_fname))
             np.save(os.path.join(
-                test_label_dir,
-                'test_'+o_img_fname[:-4] + '.npy'),
+                train_label_dir,
+                'train_' + o_img_fname[:-4] + '.npy'),
                 xy_list_array)
             if draw_gt_quad:
                 show_gt_im.save(os.path.join(show_gt_image_dir, o_img_fname))
-            test_set.append('{},{},{}\n'.format('test_'+o_img_fname,
+            train_val_set.append('{},{},{}\n'.format('train_'+o_img_fname,
                                                      d_wight,
                                                      d_height))
-
+    with open(os.path.join(cfg.data_dir, train_fname), 'w') as f_train:
+        f_train.writelines(train_val_set)
     train_img_list = os.listdir(train_image_dir)
     print('found %d train images.' % len(train_img_list))
     train_label_list = os.listdir(train_label_dir)
     print('found %d train labels.' % len(train_label_list))
 
-    # random.shuffle(train_val_set)
-    # val_count = int(cfg.validation_split_ratio * len(train_val_set))
-    #
-    # with open(os.path.join(data_dir, cfg.val_fname), 'w') as f_val:
-    #     f_val.writelines(test_set)
-    #
-    # with open(os.path.join(data_dir, cfg.train_fname), 'w') as f_train:
-    #     f_train.writelines(train_val_set)
 
 if __name__ == '__main__':
     preprocess()

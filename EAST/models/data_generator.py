@@ -30,8 +30,15 @@ def gen(batch_size=cfg.batch_size, is_val=False):
             img = image.load_img(img_path)
             img = image.img_to_array(img)
             x[i] = preprocess_input(img, mode='tf')
-            gt_file = os.path.join(cfg.data_dir,
-                                   cfg.train_label_dir_name,
+            #train_label_dir = r"D:\Documents\OCR\datas\labels_train_calligraphy640"
+            train_label_dir = os.path.join(cfg.data_dir,cfg.train_label_dir_name)
+            gt_file = os.path.join(train_label_dir,
                                    img_filename[:-4] + '_gt.npy')
             y[i] = np.load(gt_file)
         yield x, y
+
+if __name__ == "__main__":
+    for i , j in gen():
+        print(i.shape)
+        print(j.shape)
+        input()

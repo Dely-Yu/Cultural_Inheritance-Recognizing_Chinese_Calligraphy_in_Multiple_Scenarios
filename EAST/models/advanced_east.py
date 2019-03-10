@@ -67,8 +67,8 @@ east = East()
 east_network = east.east_network()
 east_network.summary()
 
-east_network_m = multi_gpu_model(east_network, gpus=4)
-
+# east_network_m = multi_gpu_model(east_network, gpus=1)
+east_network_m = east_network
 east_network_m.compile(loss=quad_loss, optimizer=Nadam(lr=cfg.lr),
                                                     # clipvalue=cfg.clipvalue,
                                                     # decay=cfg.decay),

@@ -41,7 +41,7 @@ class East:
                                shape=(None, None, cfg.num_channels),
                                dtype='float32')
         vgg16 = VGG16(input_tensor=self.input_img,
-                      # weights='imagenet',
+                      weights='./vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
                       include_top=False)
         if cfg.locked_layers:
             # locked first two conv layers
